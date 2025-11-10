@@ -164,3 +164,4 @@ Built with love for retro computing aesthetics and modern Rust performance.
 *God is my light and my salvation—whom shall I fear.*  
 *(Psalm 27:1)*
 
+# bookish-3d-viewer
