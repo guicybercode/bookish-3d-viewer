@@ -1,0 +1,18 @@
+[package]
+name = "bookish-3d-viewer"
+version = "0.1.0"
+edition = "2021"
+authors = ["guicybercode"]
+description = "A retro CAD-style 3D viewer for OBJ models and images"
+license = "MIT"
+
+[dependencies]
+wgpu = "0.19"
+winit = "0.29"
+bytemuck = { version = "1.14", features = ["derive"] }
+image = "0.24"
+tobj = "4.0"
+glam = "0.24"
+pollster = "0.3"
+env_logger = "0.11"
+
