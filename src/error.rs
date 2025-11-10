@@ -22,5 +22,3 @@ impl fmt::Display for AppError {
 
 impl Error for AppError {}
 
-pub type AppResult<T> = Result<T, AppError>;
-

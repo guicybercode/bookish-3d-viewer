@@ -152,7 +152,20 @@ fn main() {
 
     let mut app = App::new();
 
-    let mut renderer = pollster::block_on(Renderer::new(window.as_ref())).unwrap();
+    let mut renderer = match pollster::block_on(Renderer::new(window.as_ref())) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Failed to initialize renderer: {}", e);
+            eprintln!("\nTroubleshooting:");
+            eprintln!("1. Make sure you have updated graphics drivers");
+            eprintln!("2. On Linux, ensure Vulkan drivers are installed:");
+            eprintln!("   - For NVIDIA: nvidia-vulkan-driver");
+            eprintln!("   - For AMD: mesa-vulkan-drivers");
+            eprintln!("   - For Intel: vulkan-intel");
+            eprintln!("3. Try running with: RUST_LOG=warn cargo run");
+            std::process::exit(1);
+        }
+    };
 
     if let Some(path) = std::env::args().nth(1) {
         app.load_file(&mut renderer, &path);

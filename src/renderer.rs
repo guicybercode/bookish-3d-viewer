@@ -48,14 +48,36 @@ impl<'window> Renderer<'window> {
         });
 
         let surface = instance.create_surface(window)?;
-        let adapter = instance
+        
+        let adapter = match instance
             .request_adapter(&RequestAdapterOptions {
                 power_preference: PowerPreference::default(),
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
             .await
-            .ok_or("Failed to find an appropriate adapter")?;
+        {
+            Some(adapter) => adapter,
+            None => {
+                instance
+                    .request_adapter(&RequestAdapterOptions {
+                        power_preference: PowerPreference::default(),
+                        compatible_surface: Some(&surface),
+                        force_fallback_adapter: true,
+                    })
+                    .await
+                    .ok_or_else(|| {
+                        format!(
+                            "Failed to find a suitable graphics adapter.\n\
+                            Please ensure you have:\n\
+                            - Vulkan drivers installed (Linux)\n\
+                            - DirectX 12 compatible GPU (Windows)\n\
+                            - Metal compatible GPU (macOS)\n\
+                            - Updated graphics drivers"
+                        )
+                    })?
+            }
+        };
 
         let (device, queue) = adapter
             .request_device(
