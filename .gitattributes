@@ -1,0 +1,16 @@
+*.rs linguist-language=Rust
+*.toml linguist-language=Rust
+*.wgsl linguist-language=Rust
+Cargo.toml linguist-language=Rust
+Cargo.lock linguist-language=Rust
+
+*.mk linguist-vendored
+Makefile linguist-vendored
+makefile linguist-vendored
+*.make linguist-vendored
+
+target/** linguist-vendored
+*.pdb linguist-vendored
+*.exe linguist-vendored
+*.log linguist-vendored
+
