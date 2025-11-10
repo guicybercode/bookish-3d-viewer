@@ -11,10 +11,16 @@ impl Menu {
         self.visible = !self.visible;
     }
 
-    pub fn render_text(&self) -> String {
+    pub fn render_text(&self, model_info: Option<&str>) -> String {
         if !self.visible {
             return String::new();
         }
+
+        let model_section = if let Some(info) = model_info {
+            format!("\n  MODEL INFO\n  ─────────────────────────────────────────────────────\n{}\n", info)
+        } else {
+            String::from("\n  MODEL INFO\n  ─────────────────────────────────────────────────────\n  No model loaded\n")
+        };
 
         format!(
             r#"
@@ -25,7 +31,7 @@ impl Menu {
 ║  ─────────────────────────────────────────────────────  ║
 ║  Made by: guicybercode                                    ║
 ║  Repository: https://github.com/guicybercode/bookish-3d-viewer ║
-║                                                           ║
+║                                                           ║{}
 ║  CONTROLS                                                 ║
 ║  ─────────────────────────────────────────────────────  ║
 ║  Mouse:                                                   ║
@@ -41,10 +47,12 @@ impl Menu {
 ║    +/-                  - Zoom in/out                    ║
 ║    M / ESC              - Toggle menu                    ║
 ║    I                    - Toggle image mode (if image)  ║
+║    H                    - Toggle model info              ║
+║    S                    - Save configuration             ║
 ║                                                           ║
 ║  FILE LOADING                                            ║
 ║  ─────────────────────────────────────────────────────  ║
-║  Drag and drop OBJ files or images (PNG, JPG)            ║
+║  Drag and drop OBJ files or images (PNG, JPG, BMP, etc) ║
 ║  into the window, or pass file path as argument          ║
 ║                                                           ║
 ║  VERSION                                                 ║
@@ -53,7 +61,8 @@ impl Menu {
 ║                                                           ║
 ║  Press M or ESC to close this menu                       ║
 ╚═══════════════════════════════════════════════════════════╝
-"#
+"#,
+            model_section
         )
     }
 }

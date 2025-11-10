@@ -5,10 +5,10 @@ use crate::model::Model;
 use crate::camera::Camera;
 use crate::utils;
 
-pub struct Renderer {
+pub struct Renderer<'window> {
     device: Device,
     queue: Queue,
-    surface: Surface<'static>,
+    surface: Surface<'window>,
     surface_config: SurfaceConfiguration,
     wireframe_pipeline: RenderPipeline,
     flat_pipeline: RenderPipeline,
@@ -39,8 +39,8 @@ impl Uniforms {
     }
 }
 
-impl Renderer {
-    pub async fn new(window: &winit::window::Window) -> Result<Self, Box<dyn std::error::Error>> {
+impl<'window> Renderer<'window> {
+    pub async fn new(window: &'window winit::window::Window) -> Result<Self, Box<dyn std::error::Error>> {
         let size = window.inner_size();
         let instance = Instance::new(InstanceDescriptor {
             backends: Backends::all(),
@@ -277,7 +277,7 @@ impl Renderer {
     ) -> RenderPipeline {
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("Flat Shader"),
-            source: ShaderSource::Wgsl(include_str!("shaders/flat.wgsl")),
+            source: ShaderSource::Wgsl(include_str!("shaders/flat.wgsl").into()),
         });
 
         let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -351,7 +351,7 @@ impl Renderer {
     ) -> RenderPipeline {
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("Image Shader"),
-            source: ShaderSource::Wgsl(include_str!("shaders/image.wgsl")),
+            source: ShaderSource::Wgsl(include_str!("shaders/image.wgsl").into()),
         });
 
         let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -448,6 +448,8 @@ impl Renderer {
         camera: &Camera,
         model: Option<&Model>,
         image_plane: Option<(&Buffer, &Buffer, u32, &BindGroup)>,
+        wireframe_color: u32,
+        flat_color: u32,
     ) -> Result<(), SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&TextureViewDescriptor::default());
@@ -457,6 +459,47 @@ impl Renderer {
             .create_command_encoder(&CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
+
+        let model_buffers = if let Some(model) = model {
+            let view_proj = camera.get_projection_matrix() * camera.get_view_matrix();
+            let model_matrix = Mat4::IDENTITY;
+
+            let color = if self.wireframe_mode {
+                utils::color_to_rgba(wireframe_color)
+            } else if self.flat_shading {
+                utils::color_to_rgba(flat_color)
+            } else {
+                utils::color_to_rgba(wireframe_color)
+            };
+
+            let uniforms = Uniforms {
+                view_proj: view_proj.to_cols_array_2d(),
+                model: model_matrix.to_cols_array_2d(),
+                color,
+            };
+
+            self.queue.write_buffer(
+                &self.uniform_buffer,
+                0,
+                bytemuck::cast_slice(&[uniforms]),
+            );
+
+            Some((
+                self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Vertex Buffer"),
+                    contents: bytemuck::cast_slice(&model.vertices),
+                    usage: BufferUsages::VERTEX,
+                }),
+                self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Index Buffer"),
+                    contents: bytemuck::cast_slice(&model.indices),
+                    usage: BufferUsages::INDEX,
+                }),
+                model.indices.len() as u32,
+            ))
+        } else {
+            None
+        };
 
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -477,44 +520,11 @@ impl Renderer {
                     }),
                     stencil_ops: None,
                 }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
             });
 
-            if let Some(model) = model {
-                let view_proj = camera.get_projection_matrix() * camera.get_view_matrix();
-                let model_matrix = Mat4::IDENTITY;
-
-                let color = if self.wireframe_mode {
-                    utils::color_to_rgba(0x00FF00)
-                } else if self.flat_shading {
-                    utils::color_to_rgba(0xFFBF00)
-                } else {
-                    utils::color_to_rgba(0x00FF00)
-                };
-
-                let uniforms = Uniforms {
-                    view_proj: view_proj.to_cols_array_2d(),
-                    model: model_matrix.to_cols_array_2d(),
-                    color,
-                };
-
-                self.queue.write_buffer(
-                    &self.uniform_buffer,
-                    0,
-                    bytemuck::cast_slice(&[uniforms]),
-                );
-
-                let vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(&model.vertices),
-                    usage: BufferUsages::VERTEX,
-                });
-
-                let index_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(&model.indices),
-                    usage: BufferUsages::INDEX,
-                });
-
+            if let Some((ref vertex_buffer, ref index_buffer, index_count)) = model_buffers {
                 render_pass.set_pipeline(if self.wireframe_mode {
                     &self.wireframe_pipeline
                 } else {
@@ -524,7 +534,7 @@ impl Renderer {
                 render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
                 render_pass.set_index_buffer(index_buffer.slice(..), IndexFormat::Uint32);
-                render_pass.draw_indexed(0..model.indices.len() as u32, 0, 0..1);
+                render_pass.draw_indexed(0..index_count, 0, 0..1);
             }
 
             if let Some((vertex_buf, index_buf, index_count, texture_bind_group)) = image_plane {

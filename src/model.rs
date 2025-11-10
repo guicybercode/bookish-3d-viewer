@@ -41,9 +41,9 @@ pub struct Model {
 impl Model {
     pub fn from_obj(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let file = File::open(path)?;
-        let reader = BufReader::new(file);
+        let mut reader = BufReader::new(file);
         let (models, _materials) = tobj::load_obj_buf(
-            reader,
+            &mut reader,
             &tobj::LoadOptions {
                 triangulate: true,
                 single_index: true,
