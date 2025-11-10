@@ -1,6 +1,6 @@
 use glam::Vec3;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Cursor};
 use crate::utils;
 use bytemuck::{Pod, Zeroable};
 
@@ -52,6 +52,26 @@ impl Model {
             |_| Err(tobj::LoadError::GenericFailure),
         )?;
 
+        Self::from_tobj_models(models)
+    }
+
+    pub fn from_obj_bytes(data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut reader = BufReader::new(Cursor::new(data));
+        let (models, _materials) = tobj::load_obj_buf(
+            &mut reader,
+            &tobj::LoadOptions {
+                triangulate: true,
+                single_index: true,
+                ..Default::default()
+            },
+            |_| Err(tobj::LoadError::GenericFailure),
+        )?;
+
+        Self::from_tobj_models(models)
+    }
+
+    fn from_tobj_models(models: Vec<tobj::Model>) -> Result<Self, Box<dyn std::error::Error>> {
+
         if models.is_empty() {
             return Err("No models found in OBJ file".into());
         }
@@ -59,7 +79,6 @@ impl Model {
         let mesh = &models[0].mesh;
 
         let mut vertices = Vec::new();
-        let mut indices = Vec::new();
 
         let positions = &mesh.positions;
         let normals = &mesh.normals;
@@ -84,7 +103,7 @@ impl Model {
             vertices.push(Vertex::new(pos, normal));
         }
 
-        indices = mesh.indices.clone();
+        let indices = mesh.indices.clone();
 
         if vertices.is_empty() {
             return Err("No vertices found in OBJ file".into());

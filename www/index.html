@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookish 3D Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #000;
+            color: #00FF00;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            background-color: #000;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border: 2px solid #00FF00;
+            font-size: 12px;
+            max-width: 300px;
+            z-index: 100;
+        }
+
+        #controls h2 {
+            color: #FFBF00;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        #controls button {
+            background-color: #000;
+            color: #00FF00;
+            border: 1px solid #00FF00;
+            padding: 5px 10px;
+            margin: 5px 0;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+
+        #controls button:hover {
+            background-color: #00FF00;
+            color: #000;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        #drop-zone {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 3px dashed #00FF00;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 255, 0, 0.1);
+            z-index: 200;
+        }
+
+        #drop-zone.active {
+            display: flex;
+        }
+
+        #status {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 1px solid #00FF00;
+            font-size: 11px;
+        }
+
+        #menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.95);
+            padding: 20px;
+            border: 2px solid #00FF00;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            display: none;
+            z-index: 300;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+
+        #menu.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <canvas id="canvas"></canvas>
+        <div id="drop-zone">
+            <p style="font-size: 24px; color: #00FF00;">Drop OBJ file here</p>
+        </div>
+        <div id="controls">
+            <h2>BOOKISH 3D VIEWER</h2>
+            <button id="load-btn">Load OBJ File</button>
+            <button id="menu-btn">Toggle Menu</button>
+            <button id="reset-btn">Reset Camera</button>
+            <p style="margin-top: 10px; font-size: 10px;">
+                Mouse: Drag to rotate, Right-drag to pan, Scroll to zoom
+            </p>
+        </div>
+        <div id="status">Ready</div>
+        <div id="menu"></div>
+    </div>
+
+    <input type="file" id="file-input" accept=".obj">
+
+    <script type="module">
+        import init, { WasmViewer } from './pkg/bookish_3d_viewer.js';
+
+        let viewer = null;
+        let animationId = null;
+
+        async function run() {
+            await init();
+            viewer = new WasmViewer();
+            updateStatus("Viewer initialized");
+
+            const canvas = document.getElementById('canvas');
+            const container = document.getElementById('canvas-container');
+            const fileInput = document.getElementById('file-input');
+            const loadBtn = document.getElementById('load-btn');
+            const menuBtn = document.getElementById('menu-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const dropZone = document.getElementById('drop-zone');
+            const menu = document.getElementById('menu');
+
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+
+            window.addEventListener('resize', () => {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            });
+
+            loadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            resetBtn.addEventListener('click', () => {
+                if (viewer) viewer.reset_camera();
+            });
+            menuBtn.addEventListener('click', () => {
+                if (viewer) {
+                    viewer.toggle_menu();
+                    updateMenu();
+                }
+            });
+
+            canvas.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('active');
+            });
+
+            canvas.addEventListener('dragleave', () => {
+                dropZone.classList.remove('active');
+            });
+
+            canvas.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('active');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFile(files[0]);
+                }
+            });
+
+            let mouseDown = false;
+            let rightMouseDown = false;
+            let lastX = 0;
+            let lastY = 0;
+
+            canvas.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    mouseDown = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                } else if (e.button === 2) {
+                    rightMouseDown = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                }
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                mouseDown = false;
+                rightMouseDown = false;
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (mouseDown && viewer) {
+                    const deltaX = (e.clientX - lastX) * 0.01;
+                    const deltaY = (e.clientY - lastY) * 0.01;
+                    viewer.rotate_camera(deltaX, deltaY);
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                } else if (rightMouseDown && viewer) {
+                    const deltaX = (e.clientX - lastX) * 0.005;
+                    const deltaY = (e.clientY - lastY) * 0.005;
+                    viewer.pan_camera(deltaX, deltaY);
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                }
+            });
+
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                if (viewer) {
+                    const delta = e.deltaY * 0.01;
+                    viewer.zoom_camera(delta);
+                }
+            });
+
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            window.addEventListener('keydown', (e) => {
+                if (viewer) {
+                    const key = e.key;
+                    viewer.handle_keyboard(key);
+                    if (key === 'm' || key === 'M' || key === 'Escape') {
+                        updateMenu();
+                    }
+                }
+            });
+
+            function handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    handleFile(file);
+                }
+            }
+
+            async function handleFile(file) {
+                if (!file.name.endsWith('.obj')) {
+                    updateStatus("Please select an OBJ file");
+                    return;
+                }
+
+                updateStatus("Loading " + file.name + "...");
+                const arrayBuffer = await file.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+
+                try {
+                    viewer.load_model_from_bytes(uint8Array);
+                    updateStatus("Loaded: " + file.name);
+                    updateMenu();
+                } catch (error) {
+                    updateStatus("Error: " + error);
+                }
+            }
+
+            function updateStatus(message) {
+                document.getElementById('status').textContent = message;
+            }
+
+            function updateMenu() {
+                const menuDiv = document.getElementById('menu');
+                menuDiv.textContent = "Menu content - TODO: Implement menu rendering";
+                menuDiv.classList.toggle('visible');
+            }
+
+            function animate() {
+                animationId = requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        run().catch(console.error);
+    </script>
+</body>
+</html>
+

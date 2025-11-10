@@ -6,6 +6,20 @@ authors = ["guicybercode"]
 description = "A retro CAD-style 3D viewer for OBJ models and images"
 license = "MIT"
 
+[lib]
+name = "bookish_3d_viewer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "bookish-3d-viewer"
+path = "src/main.rs"
+
+[features]
+default = ["desktop"]
+desktop = []
+web = []
+nif = []
+
 [dependencies]
 wgpu = "0.19"
 winit = "0.29"
@@ -18,4 +32,12 @@ env_logger = "0.11"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 dirs = "5.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlCanvasElement", "HtmlInputElement", "File", "FileReader", "FileList", "EventTarget", "Event", "DragEvent", "MouseEvent", "KeyboardEvent", "WheelEvent"] }
+js-sys = "0.3"
+console_error_panic_hook = "0.1"
+console_log = { version = "1.0", features = ["color"] }
 

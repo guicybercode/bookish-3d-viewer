@@ -1,0 +1,13 @@
+[package]
+name = "bookish_nif"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "bookish_nif"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rustler = "0.29"
+bookish-3d-viewer = { path = "../../", features = ["nif"] }
+

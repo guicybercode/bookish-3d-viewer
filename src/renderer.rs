@@ -1,6 +1,6 @@
 use wgpu::util::DeviceExt;
 use wgpu::*;
-use glam::{Mat4, Vec3};
+use glam::Mat4;
 use crate::model::Model;
 use crate::camera::Camera;
 use crate::utils;

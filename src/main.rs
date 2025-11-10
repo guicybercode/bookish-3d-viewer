@@ -1,13 +1,4 @@
-mod camera;
-mod model;
-mod renderer;
-mod image_viewer;
-mod menu;
-mod utils;
-mod config;
-mod model_info;
-mod error;
-
+use bookish_3d_viewer::{App, renderer::Renderer, image_viewer::ImageMode};
 use std::rc::Rc;
 use winit::{
     event::*,
@@ -15,131 +6,6 @@ use winit::{
     window::WindowBuilder,
     keyboard::{Key, NamedKey},
 };
-use camera::Camera;
-use model::Model;
-use renderer::Renderer;
-use image_viewer::ImageViewer;
-use menu::Menu;
-use config::Config;
-use model_info::ModelInfo;
-
-struct App {
-    camera: Camera,
-    model: Option<Model>,
-    model_info: Option<ModelInfo>,
-    image_viewer: ImageViewer,
-    menu: Menu,
-    config: Config,
-    mouse_pressed: bool,
-    right_mouse_pressed: bool,
-    last_mouse_pos: (f64, f64),
-    show_info: bool,
-}
-
-impl App {
-    fn new() -> Self {
-        Self {
-            camera: Camera::new(800.0, 600.0),
-            model: None,
-            model_info: None,
-            image_viewer: ImageViewer::new(),
-            menu: Menu::new(),
-            config: Config::load(),
-            mouse_pressed: false,
-            right_mouse_pressed: false,
-            last_mouse_pos: (0.0, 0.0),
-            show_info: false,
-        }
-    }
-
-    fn handle_keyboard(&mut self, key: &Key) {
-        match key {
-            Key::Character(ref c) if c == "r" || c == "R" => {
-                self.camera.reset();
-            }
-            Key::Named(NamedKey::ArrowUp) => {
-                self.camera.rotate(0.0, -0.1);
-            }
-            Key::Named(NamedKey::ArrowDown) => {
-                self.camera.rotate(0.0, 0.1);
-            }
-            Key::Named(NamedKey::ArrowLeft) => {
-                self.camera.rotate(-0.1, 0.0);
-            }
-            Key::Named(NamedKey::ArrowRight) => {
-                self.camera.rotate(0.1, 0.0);
-            }
-            Key::Character(ref c) if c == "+" || c == "=" => {
-                self.camera.zoom(-0.5);
-            }
-            Key::Character(ref c) if c == "-" => {
-                self.camera.zoom(0.5);
-            }
-            Key::Named(NamedKey::Escape) => {
-                self.menu.toggle();
-            }
-            Key::Character(ref c) if c == "m" || c == "M" => {
-                self.menu.toggle();
-            }
-            Key::Character(ref c) if c == "i" || c == "I" => {
-                if self.image_viewer.has_image() {
-                    self.image_viewer.toggle_mode();
-                }
-            }
-            Key::Character(ref c) if c == "h" || c == "H" => {
-                self.show_info = !self.show_info;
-            }
-            Key::Character(ref c) if c == "s" || c == "S" => {
-                if let Err(e) = self.config.save() {
-                    eprintln!("Failed to save config: {}", e);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn load_file(&mut self, renderer: &mut Renderer, path: &str) {
-        if let Some(ext) = std::path::Path::new(path).extension().and_then(|e| e.to_str()) {
-            match ext.to_lowercase().as_str() {
-                "obj" => {
-                    match Model::from_obj(path) {
-                        Ok(mut model) => {
-                            model.calculate_normals();
-                            self.model_info = Some(ModelInfo::from_model(&model, Some(path.to_string())));
-                            self.model = Some(model);
-                            self.config.add_recent_file(path.to_string());
-                            if let Err(e) = self.config.save() {
-                                eprintln!("Failed to save config: {}", e);
-                            }
-                            println!("Loaded OBJ model: {}", path);
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to load OBJ: {}", e);
-                        }
-                    }
-                }
-                "png" | "jpg" | "jpeg" | "bmp" | "gif" | "webp" => {
-                    if let Err(e) = self.image_viewer.load_image(
-                        renderer.device(),
-                        renderer.queue(),
-                        path,
-                    ) {
-                        eprintln!("Failed to load image: {}", e);
-                    } else {
-                        self.config.add_recent_file(path.to_string());
-                        if let Err(e) = self.config.save() {
-                            eprintln!("Failed to save config: {}", e);
-                        }
-                        println!("Loaded image: {}", path);
-                    }
-                }
-                _ => {
-                    eprintln!("Unsupported file type: {:?}", ext);
-                }
-            }
-        }
-    }
-}
 
 fn main() {
     env_logger::init();
@@ -202,7 +68,18 @@ fn main() {
                     match key {
                         Key::Character(ref c) if c == "w" || c == "W" => renderer.toggle_wireframe(),
                         Key::Character(ref c) if c == "f" || c == "F" => renderer.toggle_flat_shading(),
-                        _ => app.handle_keyboard(key),
+                        _ => {
+                            let key_str = match key {
+                                Key::Character(c) => c.as_str(),
+                                Key::Named(NamedKey::ArrowUp) => "ArrowUp",
+                                Key::Named(NamedKey::ArrowDown) => "ArrowDown",
+                                Key::Named(NamedKey::ArrowLeft) => "ArrowLeft",
+                                Key::Named(NamedKey::ArrowRight) => "ArrowRight",
+                                Key::Named(NamedKey::Escape) => "Escape",
+                                _ => "",
+                            };
+                            app.handle_keyboard(key_str);
+                        }
                     }
                 }
                 WindowEvent::MouseInput {
@@ -266,7 +143,7 @@ fn main() {
                 window_id,
             } if window_id == window_clone.id() => {
                 let image_plane = if app.image_viewer.has_image()
-                    && app.image_viewer.mode == image_viewer::ImageMode::Texture3D
+                    && app.image_viewer.mode == ImageMode::Texture3D
                 {
                     if let (Some(vb), Some(ib), Some(bg)) = (
                         app.image_viewer.vertex_buffer.as_ref(),

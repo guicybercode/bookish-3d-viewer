@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    ".",
+    "native/bookish_nif",
+]
+resolver = "2"
+

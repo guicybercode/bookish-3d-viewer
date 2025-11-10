@@ -1,0 +1,15 @@
+[package]
+name = "bookish-3d-viewer"
+version = "0.1.0"
+description = "A retro CAD-style 3D viewer for OBJ models and images"
+authors = ["guicybercode"]
+license = "MIT"
+repository = "https://github.com/guicybercode/bookish-3d-viewer"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Os", "--enable-mutable-globals"]
+

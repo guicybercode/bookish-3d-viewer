@@ -1,4 +1,3 @@
-use image::RgbImage;
 use wgpu::util::DeviceExt;
 use wgpu::*;
 use glam::Vec3;
